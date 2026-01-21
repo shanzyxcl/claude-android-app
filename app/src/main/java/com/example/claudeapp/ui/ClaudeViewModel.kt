@@ -17,17 +17,17 @@ import kotlinx.coroutines.launch
 class ClaudeViewModel(
     private val apiService: ClaudeApiService
 ) : ViewModel() {
-    
+
     private val _uiState = MutableStateFlow(ClaudeUiState())
     val uiState: StateFlow<ClaudeUiState> = _uiState.asStateFlow()
-    
+
     /**
      * Send a message with streaming response.
      * Response chunks are accumulated and displayed in real-time.
      */
     fun sendStreamingMessage(message: String) {
         if (message.isBlank()) return
-        
+
         viewModelScope.launch {
             // Add user message
             _uiState.update { currentState ->
@@ -40,18 +40,19 @@ class ClaudeViewModel(
                     error = null
                 )
             }
-            
+
             // Start accumulating assistant response
             val assistantMessageIndex = _uiState.value.messages.size
             _uiState.update { currentState ->
                 currentState.copy(
                     messages = currentState.messages + ChatMessage(
                         text = "",
-                        isUser = false
+                        isUser = false,
+                        isStreaming = true
                     )
                 )
             }
-            
+
             try {
                 apiService.sendStreamingMessage(message)
                     .catch { error ->
@@ -75,9 +76,24 @@ class ClaudeViewModel(
                             )
                         }
                     }
+                    _uiState.update { currentState ->
+                        val updatedMessages = currentState.messages.toMutableList()
+                        val finalMessage = updatedMessages[assistantMessageIndex]
+                        updatedMessages[assistantMessageIndex] = finalMessage.copy(
+                            isStreaming = false
+                        )
+                        currentState.copy(messages = updatedMessages)
+                }
             } catch (e: Exception) {
                 _uiState.update { currentState ->
+                    val updatedMessages = currentState.messages.toMutableList()
+                    if (assistantMessageIndex < updatedMessages.size) {
+                        updatedMessages[assistantMessageIndex] = updatedMessages[assistantMessageIndex].copy(
+                            isStreaming = false
+                        )
+                    }
                     currentState.copy(
+                        messages = updatedMessages,
                         isLoading = false,
                         error = "Error: ${e.message}"
                     )
@@ -85,14 +101,14 @@ class ClaudeViewModel(
             }
         }
     }
-    
+
     /**
      * Send a message with non-streaming response.
      * Response is displayed once complete.
      */
     fun sendMessage(message: String) {
         if (message.isBlank()) return
-        
+
         viewModelScope.launch {
             // Add user message
             _uiState.update { currentState ->
@@ -105,10 +121,10 @@ class ClaudeViewModel(
                     error = null
                 )
             }
-            
+
             try {
                 val response = apiService.sendMessage(message)
-                
+
                 _uiState.update { currentState ->
                     currentState.copy(
                         messages = currentState.messages + ChatMessage(
@@ -128,7 +144,7 @@ class ClaudeViewModel(
             }
         }
     }
-    
+
     /**
      * Toggle between streaming and non-streaming modes.
      */
@@ -137,14 +153,14 @@ class ClaudeViewModel(
             currentState.copy(isStreamingEnabled = !currentState.isStreamingEnabled)
         }
     }
-    
+
     /**
      * Clear all messages and reset state.
      */
     fun clearMessages() {
         _uiState.update { ClaudeUiState() }
     }
-    
+
     /**
      * Dismiss the current error.
      */
@@ -171,5 +187,6 @@ data class ClaudeUiState(
 data class ChatMessage(
     val text: String,
     val isUser: Boolean,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val isStreaming: Boolean = false
 )

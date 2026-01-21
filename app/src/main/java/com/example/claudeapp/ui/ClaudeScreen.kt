@@ -16,6 +16,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.remember
+
 
 /**
  * Main chat screen composable.
@@ -160,14 +162,14 @@ fun MessageBubble(
                     }
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
+                MarkdownText(
                     text = message.text,
-                    style = MaterialTheme.typography.bodyMedium,
                     color = if (message.isUser) {
                         MaterialTheme.colorScheme.onPrimaryContainer
                     } else {
                         MaterialTheme.colorScheme.onSecondaryContainer
-                    }
+                    },
+                    isStreaming = message.isStreaming
                 )
             }
         }
